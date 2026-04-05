@@ -40,7 +40,7 @@ jobs:
     - name: Create DMG
       run: |
         mkdir -p dmg_staging
-        cp -R .build/release/XMURollcall.app dmg_staging/
+        cp -R .build/XMURollcall.app dmg_staging/
         hdiutil create -volname "XMU Rollcall" \
           -srcfolder dmg_staging \
           -ov -format UDZO \
