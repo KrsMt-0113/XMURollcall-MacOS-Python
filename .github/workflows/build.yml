@@ -37,8 +37,18 @@ jobs:
     # built with deployment target macOS 26. We compile-check tests above
     # but skip execution until GitHub provides macOS 26 runners.
 
-    - name: Upload Artifact
+    - name: Create DMG
+      run: |
+        mkdir -p dmg_staging
+        cp -R .build/release/XMURollcall.app dmg_staging/
+        hdiutil create -volname "XMU Rollcall" \
+          -srcfolder dmg_staging \
+          -ov -format UDZO \
+          XMURollcall.dmg
+
+    - name: Upload build artifact
       uses: actions/upload-artifact@v4
       with:
-        name: XMURollcall.app
-        path: .build/XMURollcall.app
+        name: XMURollcall-app
+        path: XMURollcall.dmg
+        retention-days: 30
