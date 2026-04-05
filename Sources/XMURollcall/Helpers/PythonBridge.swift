@@ -22,7 +22,7 @@ enum PythonBridgeError: Error, LocalizedError {
 }
 
 /// Bridge between Swift UI layer and Python business logic scripts.
-/// Python is executed in a child process to isolate interpreter crashes from the app.
+/// Python scripts are executed via `Process` in a child process to isolate interpreter crashes from the app.
 final class PythonBridge: @unchecked Sendable {
     static let shared = PythonBridge()
 

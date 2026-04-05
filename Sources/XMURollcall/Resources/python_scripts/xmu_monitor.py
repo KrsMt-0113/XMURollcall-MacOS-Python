@@ -1,5 +1,5 @@
 """
-XMU Rollcall monitor module adapted for PythonKit interop.
+XMU Rollcall monitor module for Swift bridge interop.
 Single-shot polling function — Swift controls the timer loop.
 All functions accept/return JSON strings for easy Swift bridging.
 """

@@ -1,5 +1,5 @@
 """
-XMU Login module adapted for PythonKit interop.
+XMU Login module for Swift bridge interop.
 Handles TronClass (type=3) login for the rollcall system.
 All functions accept/return JSON strings for easy Swift bridging.
 """
