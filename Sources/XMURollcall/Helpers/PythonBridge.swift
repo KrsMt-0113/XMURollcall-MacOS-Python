@@ -1,5 +1,4 @@
 import Foundation
-import PythonKit
 
 /// Errors that can occur during Python bridge operations.
 enum PythonBridgeError: Error, LocalizedError {
@@ -23,21 +22,21 @@ enum PythonBridgeError: Error, LocalizedError {
 }
 
 /// Bridge between Swift UI layer and Python business logic scripts.
-/// All Python calls run on a background thread to avoid blocking the UI.
+/// Python is executed in a child process to isolate interpreter crashes from the app.
 final class PythonBridge: @unchecked Sendable {
     static let shared = PythonBridge()
 
-    private var loginModule: PythonObject?
-    private var monitorModule: PythonObject?
-    private var configModule: PythonObject?
     private let scriptPaths: [String]
-    private var pythonEnvironmentReady = false
+    private let runnerScriptPath: String
+    private let pythonExecutablePath: String
 
-    /// Serial queue for all Python operations (Python GIL is not thread-safe).
+    /// Serial queue for child process execution.
     private let pythonQueue = DispatchQueue(label: "com.xmu.rollcall.python", qos: .userInitiated)
 
     private init() {
         scriptPaths = Self.resolveScriptPaths()
+        runnerScriptPath = Self.resolveRunnerScriptPath(from: scriptPaths)
+        pythonExecutablePath = Self.resolvePythonExecutablePath()
     }
 
     // MARK: - Private Helpers
@@ -53,18 +52,6 @@ final class PythonBridge: @unchecked Sendable {
                 }
             }
         }
-    }
-
-    /// Initialize Python runtime state on the dedicated queue thread exactly once.
-    private func preparePythonEnvironmentIfNeeded() throws {
-        guard !pythonEnvironmentReady else { return }
-
-        let sys = Python.import("sys")
-        for path in scriptPaths {
-            sys.path.insert(0, PythonObject(path))
-        }
-
-        pythonEnvironmentReady = true
     }
 
     /// Build candidate `python_scripts` search paths for app and development runs.
@@ -90,60 +77,99 @@ final class PythonBridge: @unchecked Sendable {
         }
     }
 
-    /// Build a detailed import failure message for diagnostics.
-    private func moduleImportErrorMessage(_ moduleName: String) -> String {
-        let pathEntries: [String]
-        if let sys = try? Python.attemptImport("sys") {
-            pathEntries = Array(sys.path).map { String($0) ?? "<unprintable>" }
-        } else {
-            pathEntries = ["<unavailable>"]
+    private static func resolveRunnerScriptPath(from scriptPaths: [String]) -> String {
+        for path in scriptPaths {
+            let candidate = path + "/xmu_runner.py"
+            if FileManager.default.fileExists(atPath: candidate) {
+                return candidate
+            }
         }
-        return [
-            "Unable to import Python module '\(moduleName)'.",
-            "Resolved script paths: \(scriptPaths)",
-            "sys.path: \(pathEntries)"
-        ].joined(separator: " ")
+        return ""
     }
 
-    private func requireConfigModule() throws -> PythonObject {
-        try preparePythonEnvironmentIfNeeded()
-        if let module = configModule {
-            return module
+    private static func resolvePythonExecutablePath() -> String {
+        if let override = ProcessInfo.processInfo.environment["XMU_ROLLCALL_PYTHON"],
+           FileManager.default.isExecutableFile(atPath: override) {
+            return override
         }
-        do {
-            let module = try Python.attemptImport("xmu_config")
-            configModule = module
-            return module
-        } catch {
-            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_config")) Python error: \(error)")
+
+        let candidates = [
+            "/opt/homebrew/bin/python3",
+            "/usr/local/bin/python3",
+            "/usr/bin/python3"
+        ]
+        for path in candidates where FileManager.default.isExecutableFile(atPath: path) {
+            return path
+        }
+        return ""
+    }
+
+    private func runPython(module: String, function: String, arguments: [String]) async throws -> String {
+        guard !runnerScriptPath.isEmpty else {
+            throw PythonBridgeError.initializationFailed(
+                "Missing runner script xmu_runner.py. Resolved script paths: \(scriptPaths)"
+            )
+        }
+        guard !pythonExecutablePath.isEmpty else {
+            throw PythonBridgeError.initializationFailed(
+                "No usable python3 executable found. Tried env XMU_ROLLCALL_PYTHON, /opt/homebrew/bin/python3, /usr/local/bin/python3, /usr/bin/python3"
+            )
+        }
+
+        let argsJSONData = try JSONSerialization.data(withJSONObject: arguments, options: [])
+        guard let argsJSON = String(data: argsJSONData, encoding: .utf8) else {
+            throw PythonBridgeError.jsonParsingFailed
+        }
+
+        return try await runOnPythonQueueThrowing {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: self.pythonExecutablePath)
+            process.arguments = [self.runnerScriptPath, module, function, argsJSON]
+
+            // Ensure bundled scripts are importable by child Python.
+            var env = ProcessInfo.processInfo.environment
+            let joinedPaths = self.scriptPaths.joined(separator: ":")
+            if let existing = env["PYTHONPATH"], !existing.isEmpty {
+                env["PYTHONPATH"] = joinedPaths + ":" + existing
+            } else {
+                env["PYTHONPATH"] = joinedPaths
+            }
+            process.environment = env
+
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
+
+            try process.run()
+            process.waitUntilExit()
+
+            let outData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+            let errData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+            let out = String(data: outData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let err = String(data: errData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            guard process.terminationStatus == 0 else {
+                throw PythonBridgeError.initializationFailed(
+                    "Python process failed (status \(process.terminationStatus)). module=\(module), function=\(function), stderr=\(err)"
+                )
+            }
+
+            if out.isEmpty {
+                throw PythonBridgeError.initializationFailed(
+                    "Python process returned empty output. module=\(module), function=\(function), stderr=\(err)"
+                )
+            }
+
+            return out
         }
     }
 
-    private func requireLoginModule() throws -> PythonObject {
-        try preparePythonEnvironmentIfNeeded()
-        if let module = loginModule {
-            return module
-        }
+    private func runPythonIgnoringErrors(module: String, function: String, arguments: [String], fallback: String) async -> String {
         do {
-            let module = try Python.attemptImport("xmu_login")
-            loginModule = module
-            return module
+            return try await runPython(module: module, function: function, arguments: arguments)
         } catch {
-            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_login")) Python error: \(error)")
-        }
-    }
-
-    private func requireMonitorModule() throws -> PythonObject {
-        try preparePythonEnvironmentIfNeeded()
-        if let module = monitorModule {
-            return module
-        }
-        do {
-            let module = try Python.attemptImport("xmu_monitor")
-            monitorModule = module
-            return module
-        } catch {
-            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_monitor")) Python error: \(error)")
+            return fallback
         }
     }
 
@@ -160,11 +186,11 @@ final class PythonBridge: @unchecked Sendable {
     /// Verify credentials by logging in to TronClass.
     /// Returns (success, cookiesJSON, displayName).
     func login(username: String, password: String) async throws -> (success: Bool, cookies: String, name: String) {
-        let resultJSON: String = try await runOnPythonQueueThrowing {
-            let module = try self.requireLoginModule()
-            let pyResult = module.login(username, password)
-            return String(pyResult) ?? "{}"
-        }
+        let resultJSON = try await runPython(
+            module: "xmu_login",
+            function: "login",
+            arguments: [username, password]
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             throw PythonBridgeError.jsonParsingFailed
@@ -183,16 +209,12 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Verify if cached cookies are still valid.
     func verifyCookies(cookiesJSON: String) async -> (valid: Bool, name: String) {
-        let resultJSON: String
-        do {
-            resultJSON = try await runOnPythonQueueThrowing {
-                let module = try self.requireLoginModule()
-                let pyResult = module.verify_cookies(cookiesJSON)
-                return String(pyResult) ?? "{}"
-            }
-        } catch {
-            return (false, "")
-        }
+        let resultJSON = await runPythonIgnoringErrors(
+            module: "xmu_login",
+            function: "verify_cookies",
+            arguments: [cookiesJSON],
+            fallback: "{}"
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             return (false, "")
@@ -207,11 +229,11 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Single-shot poll for active rollcalls.
     func pollRollcalls(cookiesJSON: String) async throws -> [RollcallData] {
-        let resultJSON: String = try await runOnPythonQueueThrowing {
-            let module = try self.requireMonitorModule()
-            let pyResult = module.poll_rollcalls(cookiesJSON)
-            return String(pyResult) ?? "{}"
-        }
+        let resultJSON = try await runPython(
+            module: "xmu_monitor",
+            function: "poll_rollcalls",
+            arguments: [cookiesJSON]
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             throw PythonBridgeError.jsonParsingFailed
@@ -247,11 +269,11 @@ final class PythonBridge: @unchecked Sendable {
     func handleRollcall(cookiesJSON: String, rollcallData: RollcallData) async throws -> (success: Bool, type: String, result: String) {
         let rollcallJSON = rollcallData.jsonString
 
-        let resultJSON: String = try await runOnPythonQueueThrowing {
-            let module = try self.requireMonitorModule()
-            let pyResult = module.handle_rollcall(cookiesJSON, rollcallJSON)
-            return String(pyResult) ?? "{}"
-        }
+        let resultJSON = try await runPython(
+            module: "xmu_monitor",
+            function: "handle_rollcall",
+            arguments: [cookiesJSON, rollcallJSON]
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             throw PythonBridgeError.jsonParsingFailed
@@ -273,11 +295,11 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Save a new account to persistent config.
     func saveAccount(nickname: String, username: String, password: String, colorHex: String) async throws -> String {
-        let resultJSON: String = try await runOnPythonQueueThrowing {
-            let module = try self.requireConfigModule()
-            let pyResult = module.save_account(nickname, username, password, colorHex)
-            return String(pyResult) ?? "{}"
-        }
+        let resultJSON = try await runPython(
+            module: "xmu_config",
+            function: "save_account",
+            arguments: [nickname, username, password, colorHex]
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             throw PythonBridgeError.jsonParsingFailed
@@ -294,16 +316,12 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Load all saved accounts from config.
     func loadAccounts() async -> [Account] {
-        let resultJSON: String
-        do {
-            resultJSON = try await runOnPythonQueueThrowing {
-                let module = try self.requireConfigModule()
-                let pyResult = module.load_accounts()
-                return String(pyResult) ?? "{}"
-            }
-        } catch {
-            return []
-        }
+        let resultJSON = await runPythonIgnoringErrors(
+            module: "xmu_config",
+            function: "load_accounts",
+            arguments: [],
+            fallback: "{}"
+        )
 
         guard let dict = parseJSON(resultJSON),
               let success = dict["success"] as? Bool, success,
@@ -330,11 +348,11 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Delete an account by ID.
     func deleteAccount(accountID: String) async throws {
-        let resultJSON: String = try await runOnPythonQueueThrowing {
-            let module = try self.requireConfigModule()
-            let pyResult = module.delete_account(accountID)
-            return String(pyResult) ?? "{}"
-        }
+        let resultJSON = try await runPython(
+            module: "xmu_config",
+            function: "delete_account",
+            arguments: [accountID]
+        )
 
         guard let dict = parseJSON(resultJSON) else {
             throw PythonBridgeError.jsonParsingFailed
@@ -349,25 +367,22 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Save session cookies for an account.
     func saveCookies(accountID: String, cookiesJSON: String) async {
-        _ = try? await runOnPythonQueueThrowing {
-            let module = try self.requireConfigModule()
-            let _ = module.save_cookies(accountID, cookiesJSON)
-            return ()
-        }
+        _ = await runPythonIgnoringErrors(
+            module: "xmu_config",
+            function: "save_cookies",
+            arguments: [accountID, cookiesJSON],
+            fallback: "{}"
+        )
     }
 
     /// Load cached cookies for an account.
     func loadCookies(accountID: String) async -> String? {
-        let resultJSON: String
-        do {
-            resultJSON = try await runOnPythonQueueThrowing {
-                let module = try self.requireConfigModule()
-                let pyResult = module.load_cookies(accountID)
-                return String(pyResult) ?? "{}"
-            }
-        } catch {
-            return nil
-        }
+        let resultJSON = await runPythonIgnoringErrors(
+            module: "xmu_config",
+            function: "load_cookies",
+            arguments: [accountID],
+            fallback: "{}"
+        )
 
         guard let dict = parseJSON(resultJSON),
               let success = dict["success"] as? Bool, success,
