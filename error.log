@@ -1,0 +1,306 @@
+-------------------------------------
+Translated Report (Full Report Below)
+-------------------------------------
+Process:             XMURollcall [64149]
+Path:                /Applications/XMURollcall.app/Contents/MacOS/XMURollcall
+Identifier:          com.xmu.rollcall
+Version:             1.0 (1.0.0)
+Code Type:           ARM-64 (Native)
+Role:                Default
+Parent Process:      launchd [1]
+Coalition:           com.xmu.rollcall [98086]
+User ID:             501
+
+Date/Time:           2026-04-05 22:03:40.8056 +0800
+Launch Time:         2026-04-05 22:03:40.7155 +0800
+Hardware Model:      Mac14,2
+OS Version:          macOS 26.4 (25E246)
+Release Type:        User
+
+Crash Reporter Key:  115A3172-DBC0-DCAF-49CF-9EC4DC93D33C
+Incident Identifier: B3EAB3B3-57F2-4540-AA78-A7758E81A6D1
+
+Sleep/Wake UUID:       C44FD570-82FC-40DA-8EDC-F20B23AC316B
+
+Time Awake Since Boot: 710000 seconds
+Time Since Wake:       24456 seconds
+
+System Integrity Protection: enabled
+
+Triggered by Thread: 0, Dispatch Queue: com.apple.main-thread
+
+Exception Type:    EXC_BREAKPOINT (SIGTRAP)
+Exception Codes:   0x0000000000000001, 0x0000000198e63cc8
+
+Termination Reason:  Namespace SIGNAL, Code 5, Trace/BPT trap: 5
+Terminating Process: exc handler [64149]
+
+
+Thread 0 Crashed::  Dispatch queue: com.apple.main-thread
+0   libswiftCore.dylib            	       0x198e63cc8 _assertionFailure(_:_:file:line:flags:) + 172
+1   libswiftCore.dylib            	       0x198d3ee44 swift_unexpectedError + 700
+2   XMURollcall                   	       0x102329aac PythonBridge.().init() + 2532
+3   XMURollcall                   	       0x1023290b4 one-time initialization function for shared + 36
+4   libdispatch.dylib             	       0x1854d64b0 _dispatch_client_callout + 16
+5   libdispatch.dylib             	       0x1854bf630 _dispatch_once_callout + 32
+6   XMURollcall                   	       0x102334908 specialized XMURollcallApp.init() + 192
+7   XMURollcall                   	       0x1023331fc protocol witness for App.init() in conformance XMURollcallApp + 20
+8   SwiftUI                       	       0x1ba9ed230 static App.main() + 208
+9   XMURollcall                   	       0x102333f3c XMURollcall_main + 36
+10  dyld                          	       0x1852bbda4 start + 6992
+
+
+Thread 0 crashed with ARM Thread State (64-bit):
+    x0: 0x0000000102c70e18   x1: 0x0000000200000003   x2: 0x00000000000010f5   x3: 0x0000000000000014
+    x4: 0x0000000102c70fc0   x5: 0x0000000000000003   x6: 0x0000000000000020   x7: 0x0000000000000000
+    x8: 0xfffffffe00000000   x9: 0x0000000000000103  x10: 0x0000000102c70f50  x11: 0x0000000102c711d0
+   x12: 0x0000000000000006  x13: 0x0000000000001c2d  x14: 0x0000000000000088  x15: 0x0000080000800008
+   x16: 0x0000000200000003  x17: 0x0000000000000003  x18: 0x0000000000000000  x19: 0x0000000000000000
+   x20: 0x000000016db13050  x21: 0x000000010233a180  x22: 0x0000000000000001  x23: 0x00000000000002c3
+   x24: 0xf0000000000000e7  x25: 0x0000000af4c14000  x26: 0x0000000102c70e10  x27: 0x0000000000000016
+   x28: 0x00000001991b2b30   fp: 0x000000016db13010   lr: 0x0000000198e63cc8
+    sp: 0x000000016db12f90   pc: 0x0000000198e63cc8 cpsr: 0x60001000
+   far: 0x0000000000000000  esr: 0xf2000001 (Breakpoint) brk 1
+
+Binary Images:
+       0x1022ec000 -        0x102347fff com.xmu.rollcall (1.0) <75415c99-02d9-33a3-bd9f-b0753ddd3bf1> /Applications/XMURollcall.app/Contents/MacOS/XMURollcall
+       0x10758c000 -        0x107957fff org.python.python (3.14.1, (c) 2001-2024 Python Software Foundation.) <c286106e-015e-3340-86b5-155a07957897> /opt/homebrew/*/Python.framework/Versions/3.14/Python
+       0x107058000 -        0x10705ffff _json.cpython-314-darwin.so (*) <ca7f4612-81a6-3727-a2c9-9e8d818766e7> /opt/homebrew/*/Python.framework/Versions/3.14/lib/python3.14/lib-dynload/_json.cpython-314-darwin.so
+       0x198d03000 -        0x1992a493f libswiftCore.dylib (*) <fb6ad37d-0f92-3774-ab61-0323db22c111> /usr/lib/swift/libswiftCore.dylib
+       0x1854bb000 -        0x18550223f libdispatch.dylib (*) <e17aa23f-db2a-3302-b14c-f6b08c540fcf> /usr/lib/system/libdispatch.dylib
+       0x1ba260000 -        0x1bb9a973f com.apple.SwiftUI (7.4.27) <4600d6f5-77b3-33c5-969c-3b38dfa4169e> /System/Library/Frameworks/SwiftUI.framework/Versions/A/SwiftUI
+       0x18529c000 -        0x185341ec7 dyld (*) <9f682dcf-340c-3bfa-bcdd-dd702f30313e> /usr/lib/dyld
+               0x0 - 0xffffffffffffffff ??? (*) <00000000-0000-0000-0000-000000000000> ???
+
+External Modification Summary:
+  Calls made by other processes targeting this process:
+    task_for_pid: 0
+    thread_create: 0
+    thread_set_state: 0
+  Calls made by this process:
+    task_for_pid: 0
+    thread_create: 0
+    thread_set_state: 0
+  Calls made by all processes on this machine:
+    task_for_pid: 0
+    thread_create: 0
+    thread_set_state: 0
+
+VM Region Summary:
+ReadOnly portion of Libraries: Total=1.1G resident=0K(0%) swapped_out_or_unallocated=1.1G(100%)
+Writable regions: Total=113.8M written=336K(0%) resident=336K(0%) swapped_out=0K(0%) unallocated=113.5M(100%)
+
+                                VIRTUAL   REGION
+REGION TYPE                        SIZE    COUNT (non-coalesced)
+===========                     =======  =======
+Activity Tracing                   256K        1
+Kernel Alloc Once                   32K        1
+MALLOC                            36.8M       14
+MALLOC guard page                 3584K        4
+Memory Tag 22                     64.0M        1
+STACK GUARD                       56.0M        1
+Stack                             8176K        1
+VM_ALLOCATE                       4112K        5
+__AUTH                            2665K      261
+__AUTH_CONST                      46.0M      508
+__CTF                               824        1
+__DATA                            13.5M      464
+__DATA_CONST                      25.5M      512
+__DATA_DIRTY                      3436K      435
+__FONT_DATA                        2352        1
+__LINKEDIT                       573.6M        4
+__OBJC_RO                         79.1M        1
+__OBJC_RW                         2597K        1
+__TEXT                           598.9M      527
+__TPRO_CONST                       128K        2
+mapped file                         80K        1
+page table in kernel               336K        1
+shared memory                       48K        2
+===========                     =======  =======
+TOTAL                              1.5G     2749
+
+
+-----------
+Full Report
+-----------
+
+{"app_name":"XMURollcall","timestamp":"2026-04-05 22:03:44.00 +0800","app_version":"1.0","slice_uuid":"75415c99-02d9-33a3-bd9f-b0753ddd3bf1","build_version":"1.0.0","platform":1,"bundleID":"com.xmu.rollcall","share_with_app_devs":1,"is_first_party":0,"bug_type":"309","os_version":"macOS 26.4 (25E246)","roots_installed":0,"name":"XMURollcall","incident_id":"B3EAB3B3-57F2-4540-AA78-A7758E81A6D1"}
+{
+  "uptime" : 710000,
+  "procRole" : "Default",
+  "version" : 2,
+  "userID" : 501,
+  "deployVersion" : 210,
+  "modelCode" : "Mac14,2",
+  "coalitionID" : 98086,
+  "osVersion" : {
+    "train" : "macOS 26.4",
+    "build" : "25E246",
+    "releaseType" : "User"
+  },
+  "captureTime" : "2026-04-05 22:03:40.8056 +0800",
+  "codeSigningMonitor" : 2,
+  "incident" : "B3EAB3B3-57F2-4540-AA78-A7758E81A6D1",
+  "pid" : 64149,
+  "translated" : false,
+  "cpuType" : "ARM-64",
+  "procLaunch" : "2026-04-05 22:03:40.7155 +0800",
+  "procStartAbsTime" : 17243473362170,
+  "procExitAbsTime" : 17243475511923,
+  "procName" : "XMURollcall",
+  "procPath" : "\/Applications\/XMURollcall.app\/Contents\/MacOS\/XMURollcall",
+  "bundleInfo" : {"CFBundleShortVersionString":"1.0","CFBundleVersion":"1.0.0","CFBundleIdentifier":"com.xmu.rollcall"},
+  "storeInfo" : {"deviceIdentifierForVendor":"DFA3195F-4075-5A44-B250-D07E3853FA7E","thirdParty":true},
+  "parentProc" : "launchd",
+  "parentPid" : 1,
+  "coalitionName" : "com.xmu.rollcall",
+  "crashReporterKey" : "115A3172-DBC0-DCAF-49CF-9EC4DC93D33C",
+  "appleIntelligenceStatus" : {"reasons":["countryBillingIneligible","countryLocationIneligible","regionIneligible"],"state":"unavailable"},
+  "developerMode" : 1,
+  "bootProgressRegister" : "0x2f000000",
+  "codeSigningID" : "com.xmu.rollcall",
+  "codeSigningTeamID" : "",
+  "codeSigningFlags" : 570425857,
+  "codeSigningValidationCategory" : 10,
+  "codeSigningTrustLevel" : 4294967295,
+  "codeSigningAuxiliaryInfo" : 0,
+  "instructionByteStream" : {"beforePC":"IAAg1MEF+LfpAwC54gMDquMDBKrkAwWq5QMGquYDB6rnAwiqrAIAlA==","atPC":"IAAg1CgAgFKJEoBS6BMAuekHAPlIAIBS6AMAOWAaALAAEDqRYxoA0A=="},
+  "bootSessionUUID" : "DEF93503-64F6-48F2-8B80-E17D40E80F3D",
+  "wakeTime" : 24456,
+  "sleepWakeUUID" : "C44FD570-82FC-40DA-8EDC-F20B23AC316B",
+  "sip" : "enabled",
+  "exception" : {"codes":"0x0000000000000001, 0x0000000198e63cc8","rawCodes":[1,6860192968],"type":"EXC_BREAKPOINT","signal":"SIGTRAP"},
+  "termination" : {"flags":0,"code":5,"namespace":"SIGNAL","indicator":"Trace\/BPT trap: 5","byProc":"exc handler","byPid":64149},
+  "os_fault" : {"process":"XMURollcall"},
+  "extMods" : {"caller":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"system":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"targeted":{"thread_create":0,"thread_set_state":0,"task_for_pid":0},"warnings":0},
+  "faultingThread" : 0,
+  "threads" : [{"triggered":true,"id":20980621,"threadState":{"x":[{"value":4341567000},{"value":8589934595,"objc-selector":"WindowFrame:moveGeneration:resizeGeneration:screen:"},{"value":4341},{"value":20},{"value":4341567424},{"value":3},{"value":32},{"value":0},{"value":18446744065119617024},{"value":259},{"value":4341567312},{"value":4341567952},{"value":6},{"value":7213},{"value":136},{"value":8796101410824},{"value":8589934595,"objc-selector":"WindowFrame:moveGeneration:resizeGeneration:screen:"},{"value":3},{"value":0},{"value":0},{"value":6135296080},{"value":4331905408},{"value":1},{"value":707},{"value":17293822569102704871},{"value":47055978496},{"value":4341566992},{"value":22},{"value":6863661872,"symbolLocation":10135,"symbol":"(anonymous namespace)::OldDemangler::demangleIdentifier(unsigned int, std::__1::optional<swift::Demangle::__runtime::Node::Kind>)::op_char_table"}],"flavor":"ARM_THREAD_STATE64","lr":{"value":6860192968},"cpsr":{"value":1610616832},"fp":{"value":6135296016},"sp":{"value":6135295888},"esr":{"value":4060086273,"description":"(Breakpoint) brk 1"},"pc":{"value":6860192968,"matchesCrashFrame":1},"far":{"value":0}},"queue":"com.apple.main-thread","frames":[{"imageOffset":1445064,"symbol":"_assertionFailure(_:_:file:line:flags:)","symbolLocation":172,"imageIndex":3},{"imageOffset":245316,"symbol":"swift_unexpectedError","symbolLocation":700,"imageIndex":3},{"imageOffset":252588,"symbol":"PythonBridge.().init()","symbolLocation":2532,"imageIndex":0},{"imageOffset":250036,"symbol":"one-time initialization function for shared","symbolLocation":36,"imageIndex":0},{"imageOffset":111792,"symbol":"_dispatch_client_callout","symbolLocation":16,"imageIndex":4},{"imageOffset":17968,"symbol":"_dispatch_once_callout","symbolLocation":32,"imageIndex":4},{"imageOffset":297224,"symbol":"specialized XMURollcallApp.init()","symbolLocation":192,"imageIndex":0},{"imageOffset":291324,"symbol":"protocol witness for App.init() in conformance XMURollcallApp","symbolLocation":20,"imageIndex":0},{"imageOffset":7918128,"symbol":"static App.main()","symbolLocation":208,"imageIndex":5},{"imageOffset":294716,"symbol":"XMURollcall_main","symbolLocation":36,"imageIndex":0},{"imageOffset":130468,"symbol":"start","symbolLocation":6992,"imageIndex":6}]}],
+  "usedImages" : [
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4331585536,
+    "CFBundleShortVersionString" : "1.0",
+    "CFBundleIdentifier" : "com.xmu.rollcall",
+    "size" : 376832,
+    "uuid" : "75415c99-02d9-33a3-bd9f-b0753ddd3bf1",
+    "path" : "\/Applications\/XMURollcall.app\/Contents\/MacOS\/XMURollcall",
+    "name" : "XMURollcall",
+    "CFBundleVersion" : "1.0.0"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4418224128,
+    "CFBundleShortVersionString" : "3.14.1, (c) 2001-2024 Python Software Foundation.",
+    "CFBundleIdentifier" : "org.python.python",
+    "size" : 3981312,
+    "uuid" : "c286106e-015e-3340-86b5-155a07957897",
+    "path" : "\/opt\/homebrew\/*\/Python.framework\/Versions\/3.14\/Python",
+    "name" : "Python",
+    "CFBundleVersion" : "3.14.1"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4412768256,
+    "size" : 32768,
+    "uuid" : "ca7f4612-81a6-3727-a2c9-9e8d818766e7",
+    "path" : "\/opt\/homebrew\/*\/Python.framework\/Versions\/3.14\/lib\/python3.14\/lib-dynload\/_json.cpython-314-darwin.so",
+    "name" : "_json.cpython-314-darwin.so"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6858747904,
+    "size" : 5904704,
+    "uuid" : "fb6ad37d-0f92-3774-ab61-0323db22c111",
+    "path" : "\/usr\/lib\/swift\/libswiftCore.dylib",
+    "name" : "libswiftCore.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6531297280,
+    "size" : 291392,
+    "uuid" : "e17aa23f-db2a-3302-b14c-f6b08c540fcf",
+    "path" : "\/usr\/lib\/system\/libdispatch.dylib",
+    "name" : "libdispatch.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 7418019840,
+    "CFBundleShortVersionString" : "7.4.27",
+    "CFBundleIdentifier" : "com.apple.SwiftUI",
+    "size" : 24418112,
+    "uuid" : "4600d6f5-77b3-33c5-969c-3b38dfa4169e",
+    "path" : "\/System\/Library\/Frameworks\/SwiftUI.framework\/Versions\/A\/SwiftUI",
+    "name" : "SwiftUI",
+    "CFBundleVersion" : "7.4.27"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6529073152,
+    "size" : 679624,
+    "uuid" : "9f682dcf-340c-3bfa-bcdd-dd702f30313e",
+    "path" : "\/usr\/lib\/dyld",
+    "name" : "dyld"
+  },
+  {
+    "size" : 0,
+    "source" : "A",
+    "base" : 0,
+    "uuid" : "00000000-0000-0000-0000-000000000000"
+  }
+],
+  "sharedCache" : {
+  "base" : 6527942656,
+  "size" : 5978570752,
+  "uuid" : "7d4906c9-9ca2-3f56-8242-3ec2c1e3245b"
+},
+  "vmSummary" : "ReadOnly portion of Libraries: Total=1.1G resident=0K(0%) swapped_out_or_unallocated=1.1G(100%)\nWritable regions: Total=113.8M written=336K(0%) resident=336K(0%) swapped_out=0K(0%) unallocated=113.5M(100%)\n\n                                VIRTUAL   REGION \nREGION TYPE                        SIZE    COUNT (non-coalesced) \n===========                     =======  ======= \nActivity Tracing                   256K        1 \nKernel Alloc Once                   32K        1 \nMALLOC                            36.8M       14 \nMALLOC guard page                 3584K        4 \nMemory Tag 22                     64.0M        1 \nSTACK GUARD                       56.0M        1 \nStack                             8176K        1 \nVM_ALLOCATE                       4112K        5 \n__AUTH                            2665K      261 \n__AUTH_CONST                      46.0M      508 \n__CTF                               824        1 \n__DATA                            13.5M      464 \n__DATA_CONST                      25.5M      512 \n__DATA_DIRTY                      3436K      435 \n__FONT_DATA                        2352        1 \n__LINKEDIT                       573.6M        4 \n__OBJC_RO                         79.1M        1 \n__OBJC_RW                         2597K        1 \n__TEXT                           598.9M      527 \n__TPRO_CONST                       128K        2 \nmapped file                         80K        1 \npage table in kernel               336K        1 \nshared memory                       48K        2 \n===========                     =======  ======= \nTOTAL                              1.5G     2749 \n",
+  "legacyInfo" : {
+  "threadTriggered" : {
+    "queue" : "com.apple.main-thread"
+  }
+},
+  "logWritingSignature" : "fb6f23962252d7849e122bc5d716ba51c034f4ef",
+  "bug_type" : "309",
+  "roots_installed" : 0,
+  "trmStatus" : 1,
+  "trialInfo" : {
+  "rollouts" : [
+    {
+      "rolloutId" : "67648e5334a82511f4acf879",
+      "factorPackIds" : [
+
+      ],
+      "deploymentId" : 240000008
+    },
+    {
+      "rolloutId" : "6434420a89ec2e0a7a38bf5a",
+      "factorPackIds" : [
+
+      ],
+      "deploymentId" : 240000011
+    }
+  ],
+  "experiments" : [
+
+  ]
+}
+}
+
+Model: Mac14,2, BootROM 18000.101.7, proc 8:4:4:0 processors, 8 GB, SMC
+Graphics: Apple M2, Apple M2, Built-In
+Display: Color LCD, 2560 x 1664 Retina, Main, MirrorOff, Online
+Memory Module: LPDDR5, Micron
+AirPort: spairport_wireless_card_type_wifi (0x14E4, 0x4387), wl0: Jan 20 2026 17:44:15 version 20.140.13.0.8.7.224 FWID 01-b2a3fd0d
+IO80211_driverkit-1555.23 "IO80211_driverkit-1555.23" Mar  5 2026 21:45:55
+AirPort:
+Bluetooth: Version (null), 0 services, 0 devices, 0 incoming serial ports
+Network Service: Wi-Fi, AirPort, en0
+Thunderbolt Bus: MacBook Air, Apple Inc.
+Thunderbolt Bus: MacBook Air, Apple Inc.

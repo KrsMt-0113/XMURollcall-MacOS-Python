@@ -28,37 +28,26 @@ final class PythonBridge: @unchecked Sendable {
     static let shared = PythonBridge()
 
     private let sys: PythonObject
-    private let loginModule: PythonObject
-    private let monitorModule: PythonObject
-    private let verifyModule: PythonObject
-    private let configModule: PythonObject
+    private var loginModule: PythonObject?
+    private var monitorModule: PythonObject?
+    private var configModule: PythonObject?
+    private let scriptPaths: [String]
 
     /// Serial queue for all Python operations (Python GIL is not thread-safe).
     private let pythonQueue = DispatchQueue(label: "com.xmu.rollcall.python", qos: .userInitiated)
 
     private init() {
-        // Import sys and configure module search path
+        // Import sys and configure module search path.
         sys = Python.import("sys")
+        scriptPaths = Self.resolveScriptPaths()
 
-        // Add bundled python_scripts directory to sys.path
-        if let resourcePath = Bundle.main.resourcePath {
-            let scriptPath = resourcePath + "/python_scripts"
-            sys.path.insert(0, PythonObject(scriptPath))
+        // Add script directories to sys.path. Missing optional modules are handled lazily.
+        for path in scriptPaths {
+            sys.path.insert(0, PythonObject(path))
         }
 
-        // Also check for scripts adjacent to executable (for development / SPM runs)
-        let executableURL = Bundle.main.executableURL?
-            .deletingLastPathComponent()
-            .appendingPathComponent("XMURollcall_XMURollcall.bundle")
-            .appendingPathComponent("python_scripts")
-        if let devPath = executableURL?.path {
-            sys.path.insert(0, PythonObject(devPath))
-        }
-
-        loginModule = Python.import("xmu_login")
-        monitorModule = Python.import("xmu_monitor")
-        verifyModule = Python.import("xmu_verify")
-        configModule = Python.import("xmu_config")
+        // Import only config eagerly, because app launch needs account list.
+        configModule = Python.attemptImport("xmu_config")
     }
 
     // MARK: - Private Helpers
@@ -71,6 +60,86 @@ final class PythonBridge: @unchecked Sendable {
                 continuation.resume(returning: result)
             }
         }
+    }
+
+    /// Run a throwing closure on the Python serial queue and return the result.
+    private func runOnPythonQueueThrowing<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            pythonQueue.async {
+                do {
+                    continuation.resume(returning: try work())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Build candidate `python_scripts` search paths for app and development runs.
+    private static func resolveScriptPaths() -> [String] {
+        var paths: [String] = []
+        let fileManager = FileManager.default
+
+        if let resourcePath = Bundle.main.resourcePath {
+            paths.append(resourcePath + "/python_scripts")
+        }
+
+        if let executablePath = Bundle.main.executableURL?.deletingLastPathComponent().path {
+            paths.append(executablePath + "/XMURollcall_XMURollcall.bundle/python_scripts")
+        }
+
+        // Keep stable ordering, de-duplicate, and only keep existing directories.
+        var seen = Set<String>()
+        return paths.filter { path in
+            guard !seen.contains(path) else { return false }
+            seen.insert(path)
+            var isDir: ObjCBool = false
+            return fileManager.fileExists(atPath: path, isDirectory: &isDir) && isDir.boolValue
+        }
+    }
+
+    /// Build a detailed import failure message for diagnostics.
+    private func moduleImportError(_ moduleName: String) -> PythonBridgeError {
+        let pathEntries = Array(sys.path).map { String($0) ?? "<unprintable>" }
+        let msg = [
+            "Unable to import Python module '\(moduleName)'.",
+            "Resolved script paths: \(scriptPaths)",
+            "sys.path: \(pathEntries)"
+        ].joined(separator: " ")
+        return .initializationFailed(msg)
+    }
+
+    private func requireConfigModule() throws -> PythonObject {
+        if let module = configModule {
+            return module
+        }
+        guard let module = Python.attemptImport("xmu_config") else {
+            throw moduleImportError("xmu_config")
+        }
+        configModule = module
+        return module
+    }
+
+    private func requireLoginModule() throws -> PythonObject {
+        if let module = loginModule {
+            return module
+        }
+        guard let module = Python.attemptImport("xmu_login") else {
+            throw moduleImportError("xmu_login")
+        }
+        loginModule = module
+        return module
+    }
+
+    private func requireMonitorModule() throws -> PythonObject {
+        if let module = monitorModule {
+            return module
+        }
+        guard let module = Python.attemptImport("xmu_monitor") else {
+            throw moduleImportError("xmu_monitor")
+        }
+        monitorModule = module
+        return module
     }
 
     /// Parse a JSON string into a dictionary.
@@ -86,8 +155,9 @@ final class PythonBridge: @unchecked Sendable {
     /// Verify credentials by logging in to TronClass.
     /// Returns (success, cookiesJSON, displayName).
     func login(username: String, password: String) async throws -> (success: Bool, cookies: String, name: String) {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.loginModule.login(username, password)
+        let resultJSON: String = try await runOnPythonQueueThrowing {
+            let module = try self.requireLoginModule()
+            let pyResult = module.login(username, password)
             return String(pyResult) ?? "{}"
         }
 
@@ -108,9 +178,15 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Verify if cached cookies are still valid.
     func verifyCookies(cookiesJSON: String) async -> (valid: Bool, name: String) {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.loginModule.verify_cookies(cookiesJSON)
-            return String(pyResult) ?? "{}"
+        let resultJSON: String
+        do {
+            resultJSON = try await runOnPythonQueueThrowing {
+                let module = try self.requireLoginModule()
+                let pyResult = module.verify_cookies(cookiesJSON)
+                return String(pyResult) ?? "{}"
+            }
+        } catch {
+            return (false, "")
         }
 
         guard let dict = parseJSON(resultJSON) else {
@@ -126,8 +202,9 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Single-shot poll for active rollcalls.
     func pollRollcalls(cookiesJSON: String) async throws -> [RollcallData] {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.monitorModule.poll_rollcalls(cookiesJSON)
+        let resultJSON: String = try await runOnPythonQueueThrowing {
+            let module = try self.requireMonitorModule()
+            let pyResult = module.poll_rollcalls(cookiesJSON)
             return String(pyResult) ?? "{}"
         }
 
@@ -165,8 +242,9 @@ final class PythonBridge: @unchecked Sendable {
     func handleRollcall(cookiesJSON: String, rollcallData: RollcallData) async throws -> (success: Bool, type: String, result: String) {
         let rollcallJSON = rollcallData.jsonString
 
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.monitorModule.handle_rollcall(cookiesJSON, rollcallJSON)
+        let resultJSON: String = try await runOnPythonQueueThrowing {
+            let module = try self.requireMonitorModule()
+            let pyResult = module.handle_rollcall(cookiesJSON, rollcallJSON)
             return String(pyResult) ?? "{}"
         }
 
@@ -190,8 +268,9 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Save a new account to persistent config.
     func saveAccount(nickname: String, username: String, password: String, colorHex: String) async throws -> String {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.configModule.save_account(nickname, username, password, colorHex)
+        let resultJSON: String = try await runOnPythonQueueThrowing {
+            let module = try self.requireConfigModule()
+            let pyResult = module.save_account(nickname, username, password, colorHex)
             return String(pyResult) ?? "{}"
         }
 
@@ -210,9 +289,15 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Load all saved accounts from config.
     func loadAccounts() async -> [Account] {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.configModule.load_accounts()
-            return String(pyResult) ?? "{}"
+        let resultJSON: String
+        do {
+            resultJSON = try await runOnPythonQueueThrowing {
+                let module = try self.requireConfigModule()
+                let pyResult = module.load_accounts()
+                return String(pyResult) ?? "{}"
+            }
+        } catch {
+            return []
         }
 
         guard let dict = parseJSON(resultJSON),
@@ -240,8 +325,9 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Delete an account by ID.
     func deleteAccount(accountID: String) async throws {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.configModule.delete_account(accountID)
+        let resultJSON: String = try await runOnPythonQueueThrowing {
+            let module = try self.requireConfigModule()
+            let pyResult = module.delete_account(accountID)
             return String(pyResult) ?? "{}"
         }
 
@@ -258,17 +344,24 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Save session cookies for an account.
     func saveCookies(accountID: String, cookiesJSON: String) async {
-        _ = await runOnPythonQueue {
-            let _ = self.configModule.save_cookies(accountID, cookiesJSON)
+        _ = try? await runOnPythonQueueThrowing {
+            let module = try self.requireConfigModule()
+            let _ = module.save_cookies(accountID, cookiesJSON)
             return ()
         }
     }
 
     /// Load cached cookies for an account.
     func loadCookies(accountID: String) async -> String? {
-        let resultJSON: String = await runOnPythonQueue {
-            let pyResult = self.configModule.load_cookies(accountID)
-            return String(pyResult) ?? "{}"
+        let resultJSON: String
+        do {
+            resultJSON = try await runOnPythonQueueThrowing {
+                let module = try self.requireConfigModule()
+                let pyResult = module.load_cookies(accountID)
+                return String(pyResult) ?? "{}"
+            }
+        } catch {
+            return nil
         }
 
         guard let dict = parseJSON(resultJSON),
