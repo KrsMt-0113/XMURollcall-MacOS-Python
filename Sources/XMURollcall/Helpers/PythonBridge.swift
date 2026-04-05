@@ -27,40 +27,20 @@ enum PythonBridgeError: Error, LocalizedError {
 final class PythonBridge: @unchecked Sendable {
     static let shared = PythonBridge()
 
-    private let sys: PythonObject
     private var loginModule: PythonObject?
     private var monitorModule: PythonObject?
     private var configModule: PythonObject?
     private let scriptPaths: [String]
+    private var pythonEnvironmentReady = false
 
     /// Serial queue for all Python operations (Python GIL is not thread-safe).
     private let pythonQueue = DispatchQueue(label: "com.xmu.rollcall.python", qos: .userInitiated)
 
     private init() {
-        // Import sys and configure module search path.
-        sys = Python.import("sys")
         scriptPaths = Self.resolveScriptPaths()
-
-        // Add script directories to sys.path. Missing optional modules are handled lazily.
-        for path in scriptPaths {
-            sys.path.insert(0, PythonObject(path))
-        }
-
-        // Import only config eagerly, because app launch needs account list.
-        configModule = try? Python.attemptImport("xmu_config")
     }
 
     // MARK: - Private Helpers
-
-    /// Run a closure on the Python serial queue and return the result.
-    private func runOnPythonQueue<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
-        await withCheckedContinuation { continuation in
-            pythonQueue.async {
-                let result = work()
-                continuation.resume(returning: result)
-            }
-        }
-    }
 
     /// Run a throwing closure on the Python serial queue and return the result.
     private func runOnPythonQueueThrowing<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
@@ -73,6 +53,18 @@ final class PythonBridge: @unchecked Sendable {
                 }
             }
         }
+    }
+
+    /// Initialize Python runtime state on the dedicated queue thread exactly once.
+    private func preparePythonEnvironmentIfNeeded() throws {
+        guard !pythonEnvironmentReady else { return }
+
+        let sys = Python.import("sys")
+        for path in scriptPaths {
+            sys.path.insert(0, PythonObject(path))
+        }
+
+        pythonEnvironmentReady = true
     }
 
     /// Build candidate `python_scripts` search paths for app and development runs.
@@ -100,7 +92,12 @@ final class PythonBridge: @unchecked Sendable {
 
     /// Build a detailed import failure message for diagnostics.
     private func moduleImportErrorMessage(_ moduleName: String) -> String {
-        let pathEntries = Array(sys.path).map { String($0) ?? "<unprintable>" }
+        let pathEntries: [String]
+        if let sys = try? Python.attemptImport("sys") {
+            pathEntries = Array(sys.path).map { String($0) ?? "<unprintable>" }
+        } else {
+            pathEntries = ["<unavailable>"]
+        }
         return [
             "Unable to import Python module '\(moduleName)'.",
             "Resolved script paths: \(scriptPaths)",
@@ -109,6 +106,7 @@ final class PythonBridge: @unchecked Sendable {
     }
 
     private func requireConfigModule() throws -> PythonObject {
+        try preparePythonEnvironmentIfNeeded()
         if let module = configModule {
             return module
         }
@@ -122,6 +120,7 @@ final class PythonBridge: @unchecked Sendable {
     }
 
     private func requireLoginModule() throws -> PythonObject {
+        try preparePythonEnvironmentIfNeeded()
         if let module = loginModule {
             return module
         }
@@ -135,6 +134,7 @@ final class PythonBridge: @unchecked Sendable {
     }
 
     private func requireMonitorModule() throws -> PythonObject {
+        try preparePythonEnvironmentIfNeeded()
         if let module = monitorModule {
             return module
         }
