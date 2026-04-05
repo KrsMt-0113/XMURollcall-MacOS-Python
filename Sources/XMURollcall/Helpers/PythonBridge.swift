@@ -47,7 +47,7 @@ final class PythonBridge: @unchecked Sendable {
         }
 
         // Import only config eagerly, because app launch needs account list.
-        configModule = Python.attemptImport("xmu_config")
+        configModule = try? Python.attemptImport("xmu_config")
     }
 
     // MARK: - Private Helpers
@@ -99,47 +99,52 @@ final class PythonBridge: @unchecked Sendable {
     }
 
     /// Build a detailed import failure message for diagnostics.
-    private func moduleImportError(_ moduleName: String) -> PythonBridgeError {
+    private func moduleImportErrorMessage(_ moduleName: String) -> String {
         let pathEntries = Array(sys.path).map { String($0) ?? "<unprintable>" }
-        let msg = [
+        return [
             "Unable to import Python module '\(moduleName)'.",
             "Resolved script paths: \(scriptPaths)",
             "sys.path: \(pathEntries)"
         ].joined(separator: " ")
-        return .initializationFailed(msg)
     }
 
     private func requireConfigModule() throws -> PythonObject {
         if let module = configModule {
             return module
         }
-        guard let module = Python.attemptImport("xmu_config") else {
-            throw moduleImportError("xmu_config")
+        do {
+            let module = try Python.attemptImport("xmu_config")
+            configModule = module
+            return module
+        } catch {
+            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_config")) Python error: \(error)")
         }
-        configModule = module
-        return module
     }
 
     private func requireLoginModule() throws -> PythonObject {
         if let module = loginModule {
             return module
         }
-        guard let module = Python.attemptImport("xmu_login") else {
-            throw moduleImportError("xmu_login")
+        do {
+            let module = try Python.attemptImport("xmu_login")
+            loginModule = module
+            return module
+        } catch {
+            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_login")) Python error: \(error)")
         }
-        loginModule = module
-        return module
     }
 
     private func requireMonitorModule() throws -> PythonObject {
         if let module = monitorModule {
             return module
         }
-        guard let module = Python.attemptImport("xmu_monitor") else {
-            throw moduleImportError("xmu_monitor")
+        do {
+            let module = try Python.attemptImport("xmu_monitor")
+            monitorModule = module
+            return module
+        } catch {
+            throw PythonBridgeError.initializationFailed("\(moduleImportErrorMessage("xmu_monitor")) Python error: \(error)")
         }
-        monitorModule = module
-        return module
     }
 
     /// Parse a JSON string into a dictionary.
