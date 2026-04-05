@@ -1,5 +1,5 @@
 """
-XMU Rollcall config management module adapted for PythonKit interop.
+XMU Rollcall config management module for Swift bridge interop.
 Manages account storage in ~/.xmu_rollcall/config.json.
 All functions accept/return JSON strings for easy Swift bridging.
 """

@@ -4,13 +4,11 @@ import PackageDescription
 let package = Package(
     name: "XMURollcall",
     platforms: [.macOS(.v26)],
-    dependencies: [
-        .package(url: "https://github.com/pvieito/PythonKit.git", branch: "master")
-    ],
+    dependencies: [],
     targets: [
         .executableTarget(
             name: "XMURollcall",
-            dependencies: ["PythonKit"],
+            dependencies: [],
             resources: [
                 .copy("Resources/python_scripts")
             ]

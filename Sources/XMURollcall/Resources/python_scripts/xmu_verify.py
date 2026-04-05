@@ -1,5 +1,5 @@
 """
-XMU Rollcall verification module adapted for PythonKit interop.
+XMU Rollcall verification module for Swift bridge interop.
 Handles number code brute-force and radar triangulation rollcall answering.
 All functions accept/return JSON strings for easy Swift bridging.
 """
